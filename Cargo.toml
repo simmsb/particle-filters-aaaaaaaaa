@@ -1,0 +1,18 @@
+[package]
+name = "fuckingparticles"
+version = "0.1.0"
+edition = "2018"
+resolver = "2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.5", features = ["dynamic"]}
+color-eyre = "0.5.11"
+itertools = "0.10.1"
+linfa = { git = "https://github.com/rust-ml/linfa.git" }
+linfa-clustering = { git = "https://github.com/rust-ml/linfa.git" }
+ndarray = { version = "0.15.3" }
+ndarray-linalg = "0.14.1"
+ndarray-rand = "0.14.0"
+ndarray-stats = "0.5.0"
