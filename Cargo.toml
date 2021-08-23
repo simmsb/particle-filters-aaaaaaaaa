@@ -7,7 +7,7 @@ resolver = "2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.5", features = ["dynamic"]}
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6", features = ["dynamic"] }
 color-eyre = "0.5.11"
 itertools = "0.10.1"
 linfa = { git = "https://github.com/rust-ml/linfa.git" }
@@ -16,3 +16,4 @@ ndarray = { version = "0.15.3" }
 ndarray-linalg = "0.14.1"
 ndarray-rand = "0.14.0"
 ndarray-stats = "0.5.0"
+simple_logger = "1.13.0"

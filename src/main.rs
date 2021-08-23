@@ -1,24 +1,45 @@
-use ndarray::array;
+use bevy::{DefaultPlugins, prelude::App, wgpu::{WgpuFeature, WgpuFeatures, WgpuOptions}};
+// use ndarray::array;
+
+use crate::render::RenderPlugin;
 
 mod filter;
+mod render;
 
 fn main() {
     color_eyre::install().unwrap();
+    // simple_logger::SimpleLogger::new().init().unwrap();
 
     println!("Hello, world!");
 
-    let mut particles = filter::Particles::new(100);
+    let particles = filter::Particles::new(500, 100.0);
 
-    let positions = vec![array![30.0, -30.0], array![30.0, 30.0], array![-30.0, -30.0]];
+    App::new()
+        .insert_resource(particles)
+        .insert_resource(WgpuOptions {
+            features: WgpuFeatures {
+                features: vec![WgpuFeature::NonFillPolygonMode],
+            },
+            ..Default::default()
+        })
+        .add_plugins(DefaultPlugins)
+        .add_plugin(RenderPlugin)
+        .run();
 
-    for i in 0..5 {
-        particles.predict();
-        // lol
-        particles.update(0.4, &positions, &[42.426, 42.426, 42.426]);
+    // let positions = vec![array![30.0, -30.0], array![30.0, 30.0], array![-30.0, -30.0]];
 
-        let estimated = particles.estimate(3);
+    // for i in 0..50 {
+    //     particles.predict(0.1, 1.0);
+    //     // lol
+    //     particles.update(1.0, &positions);
 
-        println!("{}: {:?}", i, estimated);
-        // println!("{:#?}", particles);
-    }
+    //     if particles.neff() < (particles.n as f64 / 2.0) {
+    //         particles.resample();
+    //     }
+
+    //     let estimated = particles.estimate(3);
+
+    //     println!("{}: {:?}", i, estimated);
+    //     // println!("{:#?}", particles);
+    // }
 }
