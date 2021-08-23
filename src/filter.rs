@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use linfa::traits::{Fit, Predict};
 use linfa_clustering::KMeans;
-use nd::ArrayView2;
 use ndarray as nd;
 use ndarray_linalg::Norm;
 use ndarray_rand::{rand::Rng, RandomExt};
@@ -47,8 +46,16 @@ impl Particles {
         }
     }
 
-    pub fn positions(&self) -> ArrayView2<f64> {
+    pub fn positions(&self) -> nd::ArrayView2<f64> {
         self.positions.view()
+    }
+
+    pub fn latest_groups(&self) -> nd::ArrayView1<usize> {
+        self.latest_groups.view()
+    }
+
+    pub fn weights(&self) -> nd::ArrayView1<f64> {
+        self.weights.view()
     }
 
     pub fn upper_bounds(&self) -> (f64, f64) {
@@ -92,7 +99,7 @@ impl Particles {
 
         let model = KMeans::params(n).fit(&observations).unwrap();
 
-        dbg!(model.centroids());
+        // dbg!(model.centroids());
 
         let dataset = model.predict(observations);
 

@@ -77,7 +77,7 @@ fn update_particles(
         array![-30.0, -30.0],
     ];
 
-    particles.predict(0.1, 1.0 / 60.0);
+    particles.predict(0.1, 1.0 / 10.0);
 
     // lol
     particles.update(1.0, &positions);
@@ -109,14 +109,25 @@ fn update_particles(
 
     let colours = particle_mesh.attribute_mut("Vertex_Color").unwrap();
 
-    if let bevy::render::mesh::VertexAttributeValues::Float32x3(ref mut points) = colours {
-        points.resize(particles.n, [1.0, 1.0, 1.0]);
+    let max_colour = *particles.latest_groups().iter().max().unwrap() as f64;
+
+    if let bevy::render::mesh::VertexAttributeValues::Float32x3(ref mut colours) = colours {
+        use palette::FromColor;
+
+        colours.resize(particles.n, [1.0, 1.0, 1.0]);
 
         // TODO: hue
 
-        // for (idx, pos) in particles.positions().columns().into_iter().enumerate() {
-        //     points[idx] = [pos[0] as f32, pos[1] as f32, 0.0];
-        // }
+        for (idx, (weight, grp)) in
+            itertools::izip!(particles.weights(), particles.latest_groups()).enumerate()
+        {
+            let col = palette::rgb::Rgb::from_color(palette::Hsv::new(
+                palette::RgbHue::from_degrees(360.0 * *grp as f64 / (max_colour + 1.0)),
+                1.0,
+                (*weight + 0.001) * 200.0,
+            ));
+            colours[idx] = [col.red as f32, col.green as f32, col.blue as f32];
+        }
     } else {
         panic!("huh")
     }
