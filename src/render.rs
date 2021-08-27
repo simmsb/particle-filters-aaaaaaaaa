@@ -1,10 +1,14 @@
 use bevy::{
     prelude::*,
+    reflect::TypeUuid,
     render::{
         pipeline::{Face, PipelineDescriptor, PrimitiveState, RenderPipeline},
+        render_graph::{base, AssetRenderResourcesNode, RenderGraph},
+        renderer::RenderResources,
         shader::{ShaderStage, ShaderStages},
     },
 };
+use itertools::Itertools;
 use ndarray::array;
 
 use crate::filter::Particles;
@@ -14,17 +18,27 @@ pub struct RenderPlugin;
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(init_particles)
+            .add_asset::<PointSize>()
             .add_system(update_particles);
     }
 }
 
 struct ParticleMeshHandle(Handle<Mesh>);
+struct LandmarkMeshHandle(Handle<Mesh>);
+
+#[derive(RenderResources, Default, TypeUuid)]
+#[uuid = "ae94b745-c056-44f7-89e7-f26cad57df40"]
+struct PointSize {
+    value: f32,
+}
 
 fn init_particles(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut shaders: ResMut<Assets<Shader>>,
+    mut point_sizes: ResMut<Assets<PointSize>>,
+    mut render_graph: ResMut<RenderGraph>,
 ) {
     let pipeline_handle = pipelines.add(PipelineDescriptor {
         primitive: PrimitiveState {
@@ -42,6 +56,70 @@ fn init_particles(
         })
     });
 
+    render_graph.add_system_node(
+        "point_size",
+        AssetRenderResourcesNode::<PointSize>::new(true),
+    );
+
+    render_graph
+        .add_node_edge("point_size", base::node::MAIN_PASS)
+        .unwrap();
+
+    do_particles(
+        &mut meshes,
+        &mut commands,
+        &mut point_sizes,
+        pipeline_handle.clone(),
+    );
+
+    do_landmarks(
+        &mut meshes,
+        &mut commands,
+        &mut point_sizes,
+        pipeline_handle,
+    );
+
+
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+}
+
+fn do_landmarks(
+    meshes: &mut ResMut<Assets<Mesh>>,
+    commands: &mut Commands,
+    point_sizes: &mut ResMut<Assets<PointSize>>,
+    pipeline_handle: Handle<PipelineDescriptor>,
+) {
+    let mut landmark_mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
+
+    let vertexes = vec![[30.0, -30.0, 0.0], [30.0, 30.0, 0.0], [-30.0, -30.0, 0.0]];
+    landmark_mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertexes);
+
+    let v_color = vec![[1.0, 0.1, 0.1], [1.0, 0.1, 0.1], [1.0, 0.1, 0.1]];
+    landmark_mesh.set_attribute("Vertex_Color", v_color);
+
+    let landmark_mesh_handle = meshes.add(landmark_mesh);
+
+    let point_size = point_sizes.add(PointSize { value: 7.0 });
+
+    commands
+        .spawn_bundle(MeshBundle {
+            mesh: landmark_mesh_handle.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                pipeline_handle,
+            )]),
+            ..Default::default()
+        })
+        .insert(point_size);
+
+    commands.insert_resource(LandmarkMeshHandle(landmark_mesh_handle));
+}
+
+fn do_particles(
+    meshes: &mut ResMut<Assets<Mesh>>,
+    commands: &mut Commands,
+    point_sizes: &mut ResMut<Assets<PointSize>>,
+    pipeline_handle: Handle<PipelineDescriptor>,
+) {
     let mut particle_mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
 
     let vertexes = vec![[0.0, 0.0, 0.0]];
@@ -50,19 +128,21 @@ fn init_particles(
     let v_color = vec![[1.0, 0.1, 0.1]];
     particle_mesh.set_attribute("Vertex_Color", v_color);
 
-    let mesh_handle = meshes.add(particle_mesh);
+    let particle_mesh_handle = meshes.add(particle_mesh);
 
-    commands.spawn_bundle(MeshBundle {
-        mesh: mesh_handle.clone(),
-        render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-            pipeline_handle,
-        )]),
-        ..Default::default()
-    });
+    let point_size = point_sizes.add(PointSize { value: 4.0 });
 
-    commands.insert_resource(ParticleMeshHandle(mesh_handle));
+    commands
+        .spawn_bundle(MeshBundle {
+            mesh: particle_mesh_handle.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                pipeline_handle,
+            )]),
+            ..Default::default()
+        })
+        .insert(point_size);
 
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.insert_resource(ParticleMeshHandle(particle_mesh_handle));
 }
 
 fn update_particles(
@@ -77,12 +157,14 @@ fn update_particles(
         array![-30.0, -30.0],
     ];
 
-    particles.predict(0.1, 1.0 / 10.0);
+    particles.predict(1.0, 1.0 / 10.0);
 
     // lol
-    particles.update(1.0, &positions);
+    particles.update(20.0, &positions);
 
-    if particles.neff() < (particles.n as f64 / 2.0) {
+    if particles.neff() < (particles.n as f64 / 6.0) {
+        println!("resampling");
+        dbg!(particles.neff());
         particles.resample();
     }
 
@@ -110,21 +192,22 @@ fn update_particles(
     let colours = particle_mesh.attribute_mut("Vertex_Color").unwrap();
 
     let max_colour = *particles.latest_groups().iter().max().unwrap() as f64;
+    let (&min_weight, &max_weight) = particles.weights().iter().minmax().into_option().unwrap();
+    let weight_range = max_weight - min_weight;
 
     if let bevy::render::mesh::VertexAttributeValues::Float32x3(ref mut colours) = colours {
         use palette::FromColor;
 
         colours.resize(particles.n, [1.0, 1.0, 1.0]);
 
-        // TODO: hue
-
         for (idx, (weight, grp)) in
             itertools::izip!(particles.weights(), particles.latest_groups()).enumerate()
         {
+            let val = ((*weight - min_weight) / weight_range).abs() * 0.9 + 0.1;
             let col = palette::rgb::Rgb::from_color(palette::Hsv::new(
                 palette::RgbHue::from_degrees(360.0 * *grp as f64 / (max_colour + 1.0)),
                 1.0,
-                (*weight + 0.001) * 200.0,
+                val,
             ));
             colours[idx] = [col.red as f32, col.green as f32, col.blue as f32];
         }
@@ -149,10 +232,14 @@ layout(set = 1, binding = 0) uniform Transform {
     mat4 Model;
 };
 
+layout(set = 2, binding = 0) uniform PointSize_value {
+    float point_size;
+};
+
 void main() {
     v_Color = Vertex_Color;
     gl_Position = ViewProj * Model * vec4(Vertex_Position, 1.0);
-    gl_PointSize = 5.0;
+    gl_PointSize = point_size;
 }
 ";
 

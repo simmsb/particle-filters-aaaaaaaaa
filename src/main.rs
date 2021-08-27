@@ -12,7 +12,7 @@ fn main() {
 
     println!("Hello, world!");
 
-    let particles = filter::Particles::new(500, 100.0);
+    let particles = filter::Particles::new(1000, 100.0);
 
     App::new()
         .insert_resource(particles)

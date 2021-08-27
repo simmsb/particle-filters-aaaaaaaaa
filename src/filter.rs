@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use linfa::traits::{Fit, Predict};
-use linfa_clustering::KMeans;
+use linfa_clustering::GaussianMixtureModel;
 use ndarray as nd;
 use ndarray_linalg::Norm;
 use ndarray_rand::{rand::Rng, RandomExt};
@@ -79,6 +79,8 @@ impl Particles {
     }
 
     pub fn update(&mut self, std_dev: f64, positions: &[nd::Array1<f64>]) {
+        let mut these_weights = nd::Array1::zeros(self.n);
+
         for pos in positions {
             let dist = &self.positions - pos;
 
@@ -86,9 +88,11 @@ impl Particles {
                 .axis_iter(nd::Axis(0))
                 .map(|x| x.norm())
                 .collect::<Vec<_>>();
-            self.weights *= &gen_weight_updates(&dist_norm, std_dev);
+
+            these_weights.zip_mut_with(&gen_weight_updates(&dist_norm, std_dev), |a: &mut f64, b: &f64| { *a = a.max(*b)});
         }
 
+        self.weights *= &these_weights;
         self.weights += 1e-300;
         self.weights /= self.weights.sum();
     }
@@ -97,7 +101,11 @@ impl Particles {
         // TODO: don't do this clone
         let observations = linfa::DatasetBase::from(self.positions.clone());
 
-        let model = KMeans::params(n).fit(&observations).unwrap();
+        let model = GaussianMixtureModel::params(n)
+            .with_n_runs(10)
+            .with_tolerance(1e-4)
+            // .with_init_method(linfa_clustering::GmmInitMethod::Random)
+            .fit(&observations).unwrap();
 
         // dbg!(model.centroids());
 
@@ -168,14 +176,15 @@ impl Particles {
 
         // introduce a bit of randomness
         self.positions += &norm_rand_array2(0.0, 1.0, self.n);
-        self.velocities += &norm_rand_array2(0.0, 0.1, self.n);
+        self.velocities += &norm_rand_array2(0.0, 0.3, self.n);
 
         let mut rng = ndarray_rand::rand::thread_rng();
 
-        for _ in 0..rng.gen_range(0..(self.n / 4)) {
-            self.positions[(rng.gen_range(0..self.n), 0)] =
+        for _ in 0..(self.n / 10) {
+            let idx = rng.gen_range(0..self.n);
+            self.positions[(idx, 0)] =
                 rng.gen_range(-self.search_space..self.search_space);
-            self.positions[(rng.gen_range(0..self.n), 1)] =
+            self.positions[(idx, 1)] =
                 rng.gen_range(-self.search_space..self.search_space);
         }
 
@@ -183,7 +192,7 @@ impl Particles {
     }
 
     pub fn neff(&self) -> f64 {
-        1.0 / self.weights.fold(0.0, |acc, val| acc + val * val)
+        1.0 / self.weights.mapv(|val| val * val).sum()
     }
 }
 

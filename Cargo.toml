@@ -12,8 +12,10 @@ color-eyre = "0.5.11"
 itertools = "0.10.1"
 linfa = { git = "https://github.com/rust-ml/linfa.git" }
 linfa-clustering = { git = "https://github.com/rust-ml/linfa.git" }
-ndarray = { version = "0.15.3" }
-ndarray-linalg = "0.14.1"
+ndarray = { version = "0.15.3", features = ["blas"] }
+blas-src = { version = "0.8", features = ["openblas"] }
+openblas-src = { version = "0.10", features = ["cblas", "static"] }
+ndarray-linalg = { version = "0.14.1", features = ["openblas-static"] }
 ndarray-rand = "0.14.0"
 ndarray-stats = "0.5.0"
 palette = "0.6.0"
