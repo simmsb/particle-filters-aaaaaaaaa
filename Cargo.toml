@@ -6,8 +6,13 @@ resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "speedy"
+path = "src/speedy.rs"
+
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6", features = ["dynamic"] }
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6" }
+bevy_dylib = { git = "https://github.com/bevyengine/bevy", rev = "62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6" }
 color-eyre = "0.5.11"
 itertools = "0.10.1"
 linfa = { git = "https://github.com/rust-ml/linfa.git" }
@@ -20,3 +25,14 @@ ndarray-rand = "0.14.0"
 ndarray-stats = "0.5.0"
 palette = "0.6.0"
 simple_logger = "1.13.0"
+fast-math = "0.1.1"
+
+[profile.release]
+debug = 1
+lto = "thin"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

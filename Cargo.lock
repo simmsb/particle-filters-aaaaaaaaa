@@ -239,7 +239,6 @@ name = "bevy"
 version = "0.5.0"
 source = "git+https://github.com/bevyengine/bevy?rev=62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6#62e4e59a864a3d2ca01e0372cb2f0ffed0d2dbf6"
 dependencies = [
- "bevy_dylib",
  "bevy_internal",
 ]
 
@@ -1465,6 +1464,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast-math"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2465292146cdfc2011350fe3b1c616ac83cf0faeedb33463ba1c332ed8948d66"
+dependencies = [
+ "ieee754",
+]
+
+[[package]]
 name = "fastrand"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1541,8 +1549,10 @@ name = "fuckingparticles"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_dylib",
  "blas-src",
  "color-eyre",
+ "fast-math",
  "itertools",
  "linfa",
  "linfa-clustering",
@@ -1989,6 +1999,12 @@ name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
+name = "ieee754"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9007da9cacbd3e6343da136e98b0d2df013f553d35bdec8b518f07bea768e19c"
 
 [[package]]
 name = "image"

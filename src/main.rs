@@ -1,4 +1,7 @@
-use bevy::{DefaultPlugins, prelude::App, wgpu::{WgpuFeature, WgpuFeatures, WgpuOptions}};
+use bevy::{DefaultPlugins, prelude::App, wgpu::{WgpuFeature, WgpuFeatures, WgpuOptions}, diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}};
+
+#[cfg(debug_assertions)]
+#[allow(unused_imports)] use bevy_dylib;
 // use ndarray::array;
 
 use crate::render::RenderPlugin;
@@ -12,7 +15,7 @@ fn main() {
 
     println!("Hello, world!");
 
-    let particles = filter::Particles::new(1000, 100.0);
+    let particles = filter::Particles::new(10000, 100.0);
 
     App::new()
         .insert_resource(particles)
@@ -24,6 +27,9 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
         .add_plugin(RenderPlugin)
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugin(LogDiagnosticsPlugin::default())
+        // .add_plugin(bevy::wgpu::diagnostic::WgpuResourceDiagnosticsPlugin::default())
         .run();
 
     // let positions = vec![array![30.0, -30.0], array![30.0, 30.0], array![-30.0, -30.0]];

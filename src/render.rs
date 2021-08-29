@@ -79,7 +79,6 @@ fn init_particles(
         pipeline_handle,
     );
 
-
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 }
 
@@ -91,10 +90,10 @@ fn do_landmarks(
 ) {
     let mut landmark_mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
 
-    let vertexes = vec![[30.0, -30.0, 0.0], [30.0, 30.0, 0.0], [-30.0, -30.0, 0.0]];
-    landmark_mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertexes);
+    let vertexes = vec![[50.0, -30.0, 0.0], [30.0, 60.0, 0.0], [-70.0, -30.0, 0.0], [0.0, 0.0, 0.0]];
+    let v_color = vec![[1.0, 0.1, 0.1]; vertexes.len()];
 
-    let v_color = vec![[1.0, 0.1, 0.1], [1.0, 0.1, 0.1], [1.0, 0.1, 0.1]];
+    landmark_mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertexes);
     landmark_mesh.set_attribute("Vertex_Color", v_color);
 
     let landmark_mesh_handle = meshes.add(landmark_mesh);
@@ -152,9 +151,10 @@ fn update_particles(
 ) {
     // lol
     let positions = vec![
-        array![30.0, -30.0],
-        array![30.0, 30.0],
-        array![-30.0, -30.0],
+        array![50.0, -30.0],
+        array![30.0, 60.0],
+        array![-70.0, -30.0],
+        array![0.0, 0.0],
     ];
 
     particles.predict(1.0, 1.0 / 10.0);
@@ -162,13 +162,14 @@ fn update_particles(
     // lol
     particles.update(20.0, &positions);
 
-    if particles.neff() < (particles.n as f64 / 6.0) {
+    if particles.neff() < (particles.n as f32 / 6.0) {
         println!("resampling");
         dbg!(particles.neff());
         particles.resample();
+        let _estimated = particles.estimate(positions.len());
     }
 
-    let estimated = particles.estimate(3);
+    // let estimated = particles.estimate(3);
 
     let particle_mesh = meshes.get_mut(&mesh_handle.0).unwrap();
     let vertexes = particle_mesh
@@ -207,7 +208,7 @@ fn update_particles(
             let col = palette::rgb::Rgb::from_color(palette::Hsv::new(
                 palette::RgbHue::from_degrees(360.0 * *grp as f64 / (max_colour + 1.0)),
                 1.0,
-                val,
+                val as f64,
             ));
             colours[idx] = [col.red as f32, col.green as f32, col.blue as f32];
         }

@@ -8,32 +8,32 @@ use ndarray_stats::{QuantileExt, SummaryStatisticsExt};
 
 #[derive(Debug)]
 pub struct Particles {
-    positions: nd::Array2<f64>,
-    velocities: nd::Array2<f64>,
-    weights: nd::Array1<f64>,
+    positions: nd::Array2<f32>,
+    velocities: nd::Array2<f32>,
+    weights: nd::Array1<f32>,
     latest_groups: nd::Array1<usize>,
     pub n: usize,
-    search_space: f64,
+    search_space: f32,
 }
 
-fn norm_rand_array2(mean: f64, std_dev: f64, n: usize) -> nd::Array2<f64> {
+fn norm_rand_array2(mean: f32, std_dev: f32, n: usize) -> nd::Array2<f32> {
     let distr = ndarray_rand::rand_distr::Normal::new(mean, std_dev).unwrap();
 
     nd::Array::random((n, 2), distr)
 }
 
-fn uniform_rand_array2(min: f64, max: f64, n: usize) -> nd::Array2<f64> {
+fn uniform_rand_array2(min: f32, max: f32, n: usize) -> nd::Array2<f32> {
     let distr = ndarray_rand::rand_distr::Uniform::new(min, max);
 
     nd::Array::random((n, 2), distr)
 }
 
 impl Particles {
-    pub fn new(n: usize, search_space: f64) -> Self {
+    pub fn new(n: usize, search_space: f32) -> Self {
         let positions = uniform_rand_array2(-search_space, search_space, n);
         let velocities = norm_rand_array2(0.0, 1.0, n);
 
-        let weights = nd::Array::from_elem(n, 1.0 / n as f64);
+        let weights = nd::Array::from_elem(n, 1.0 / n as f32);
         let latest_groups = nd::Array::zeros(n);
 
         Self {
@@ -46,7 +46,7 @@ impl Particles {
         }
     }
 
-    pub fn positions(&self) -> nd::ArrayView2<f64> {
+    pub fn positions(&self) -> nd::ArrayView2<f32> {
         self.positions.view()
     }
 
@@ -54,11 +54,11 @@ impl Particles {
         self.latest_groups.view()
     }
 
-    pub fn weights(&self) -> nd::ArrayView1<f64> {
+    pub fn weights(&self) -> nd::ArrayView1<f32> {
         self.weights.view()
     }
 
-    pub fn upper_bounds(&self) -> (f64, f64) {
+    pub fn upper_bounds(&self) -> (f32, f32) {
         // minmax pls?
         let max_x = *self.positions.column(0).max().unwrap();
         let min_x = *self.positions.column(0).min().unwrap();
@@ -73,23 +73,20 @@ impl Particles {
         (x, y)
     }
 
-    pub fn predict(&mut self, std_dev: f64, dt: f64) {
+    pub fn predict(&mut self, std_dev: f32, dt: f32) {
         let offsets = norm_rand_array2(0.0, std_dev, self.n);
         self.positions += &((&self.velocities + offsets) * dt);
     }
 
-    pub fn update(&mut self, std_dev: f64, positions: &[nd::Array1<f64>]) {
+    pub fn update(&mut self, std_dev: f32, positions: &[nd::Array1<f32>]) {
         let mut these_weights = nd::Array1::zeros(self.n);
 
         for pos in positions {
-            let dist = &self.positions - pos;
+            let weights = self
+                .positions
+                .map_axis(nd::Axis(1), |p| gen_weight_update((&p - &pos.view()).norm(), std_dev));
 
-            let dist_norm = dist
-                .axis_iter(nd::Axis(0))
-                .map(|x| x.norm())
-                .collect::<Vec<_>>();
-
-            these_weights.zip_mut_with(&gen_weight_updates(&dist_norm, std_dev), |a: &mut f64, b: &f64| { *a = a.max(*b)});
+            these_weights.zip_mut_with(&weights, |a: &mut f32, b: &f32| *a = a.max(*b));
         }
 
         self.weights *= &these_weights;
@@ -97,15 +94,16 @@ impl Particles {
         self.weights /= self.weights.sum();
     }
 
-    pub fn estimate(&mut self, n: usize) -> Vec<((f64, f64), (f64, f64))> {
+    pub fn estimate(&mut self, n: usize) -> Vec<((f32, f32), (f32, f32))> {
         // TODO: don't do this clone
         let observations = linfa::DatasetBase::from(self.positions.clone());
 
         let model = GaussianMixtureModel::params(n)
-            .with_n_runs(10)
+            .with_n_runs(5)
             .with_tolerance(1e-4)
             // .with_init_method(linfa_clustering::GmmInitMethod::Random)
-            .fit(&observations).unwrap();
+            .fit(&observations)
+            .unwrap();
 
         // dbg!(model.centroids());
 
@@ -147,8 +145,8 @@ impl Particles {
         let distr = ndarray_rand::rand_distr::Uniform::new(0.0, 1.0);
 
         let weight_positions = (nd::Array::random(self.n, distr)
-            + nd::Array::range(0.0, self.n as f64, 1.0))
-            / self.n as f64;
+            + nd::Array::range(0.0, self.n as f32, 1.0))
+            / self.n as f32;
 
         let mut indexes = nd::Array1::<usize>::zeros(self.n);
 
@@ -169,38 +167,38 @@ impl Particles {
             }
         }
 
-        self.positions =
-            nd::Array::from_shape_fn((self.n, 2), |(i, j)| self.positions[(indexes[i], j)]);
-        self.velocities =
-            nd::Array::from_shape_fn((self.n, 2), |(i, j)| self.velocities[(indexes[i], j)]);
+        self.positions = self.positions.select(nd::Axis(0), indexes.as_slice().unwrap());
+
+        // self.positions =
+        //     nd::Array::from_shape_fn((self.n, 2), |(i, j)| self.positions[(indexes[i], j)]);
+        // self.velocities =
+        //     nd::Array::from_shape_fn((self.n, 2), |(i, j)| self.velocities[(indexes[i], j)]);
 
         // introduce a bit of randomness
         self.positions += &norm_rand_array2(0.0, 1.0, self.n);
-        self.velocities += &norm_rand_array2(0.0, 0.3, self.n);
+        self.velocities += &norm_rand_array2(0.0, 0.1, self.n);
 
         let mut rng = ndarray_rand::rand::thread_rng();
 
         for _ in 0..(self.n / 10) {
             let idx = rng.gen_range(0..self.n);
-            self.positions[(idx, 0)] =
-                rng.gen_range(-self.search_space..self.search_space);
-            self.positions[(idx, 1)] =
-                rng.gen_range(-self.search_space..self.search_space);
+            self.positions[(idx, 0)] = rng.gen_range(-self.search_space..self.search_space);
+            self.positions[(idx, 1)] = rng.gen_range(-self.search_space..self.search_space);
         }
 
-        self.weights.fill(1.0 / self.n as f64);
+        self.weights.fill(1.0 / self.n as f32);
     }
 
-    pub fn neff(&self) -> f64 {
+    pub fn neff(&self) -> f32 {
         1.0 / self.weights.mapv(|val| val * val).sum()
     }
 }
 
-fn gen_weight_updates(distances: &[f64], std_dev: f64) -> nd::Array1<f64> {
-    fn pdf(x: f64, mean: f64, std_dev: f64) -> f64 {
+fn gen_weight_update(distance: f32, std_dev: f32) -> f32 {
+    fn pdf(x: f32, mean: f32, std_dev: f32) -> f32 {
         let d = (x - mean) / std_dev;
-        (-0.5 * d * d).exp() / (2.5066282746310002 * std_dev)
+        fast_math::exp(-0.5 * d * d) / (2.5066282746310002 * std_dev)
     }
 
-    nd::Array1::from_iter(distances.iter().map(|d| pdf(*d, 0.0, std_dev)))
+    pdf(distance, 0.0, std_dev)
 }
